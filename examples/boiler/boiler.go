@@ -9,6 +9,7 @@ import (
 	"github.com/ugabiga/go-orm-example/internal"
 	"github.com/volatiletech/null/v8"
 	"github.com/volatiletech/sqlboiler/v4/boil"
+	"github.com/volatiletech/sqlboiler/v4/queries"
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 	"log"
 	"math/rand"
@@ -25,9 +26,21 @@ func Execute() {
 	aggregate(ctx, conn)
 	pagination(ctx, conn)
 	transform(ctx, conn)
-	// Raw Query
+	rawQuery(ctx, conn)
 
 	// Event
+}
+
+func rawQuery(ctx context.Context, conn *sql.DB) {
+	var task struct {
+		ID    int64  `json:"id"`
+		Title string `json:"title"`
+	}
+	err := queries.Raw(
+		"SELECT * FROM tasks WHERE title LIKE '%Task%'",
+	).Bind(ctx, conn, &task)
+	internal.LogFatal(err)
+	internal.PrintJSONLog(task)
 }
 
 func transform(ctx context.Context, conn *sql.DB) {
