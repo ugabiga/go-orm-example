@@ -22,13 +22,36 @@ func Execute() {
 
 	crud(ctx, conn)
 	queryWithRelation(ctx, conn)
+	clearModels(ctx, conn)
 	seed(100, ctx, conn)
+	aggregate(err, ctx, conn)
 
-	// Aggregation
 	// Pagination
 	// Transform
 	// Raw Query
 	// Event
+}
+
+func aggregate(err error, ctx context.Context, conn *sql.DB) {
+	var result []struct {
+		UserID int64 `boil:"user_id"`
+		Count  int64 `boil:"count"`
+	}
+	err = models.Tasks(
+		qm.Select("count(*) as count", models.TaskColumns.UserID),
+		qm.GroupBy(models.TaskColumns.UserID),
+		qm.OrderBy("count DESC"),
+		qm.Limit(10),
+	).Bind(ctx, conn, &result)
+	internal.LogFatal(err)
+	internal.PrintJSONLog(result)
+}
+
+func clearModels(ctx context.Context, conn *sql.DB) {
+	_, err := models.Tasks().DeleteAll(ctx, conn)
+	internal.LogFatal(err)
+	_, err = models.Users().DeleteAll(ctx, conn)
+	internal.LogFatal(err)
 }
 
 func seed(count int, ctx context.Context, conn *sql.DB) {
