@@ -10,7 +10,6 @@ import (
 func init() {
 	boilerCmd.AddCommand(boilerMigrateUpCmd)
 	boilerCmd.AddCommand(boilerMigrateDownCmd)
-	boilerCmd.AddCommand(boilerSeedCmd)
 	boilerCmd.AddCommand(boilerRunCmd)
 }
 
@@ -37,14 +36,6 @@ var boilerMigrateDownCmd = &cobra.Command{
 	Short: "run migrate down",
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.DownMigration(migrationPath)
-	},
-}
-
-var boilerSeedCmd = &cobra.Command{
-	Use:   "seed",
-	Short: "seed data",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("app")
 	},
 }
 

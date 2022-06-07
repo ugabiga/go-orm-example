@@ -10,34 +10,59 @@ import (
 	"github.com/volatiletech/null/v8"
 	"github.com/volatiletech/sqlboiler/v4/boil"
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
+	"log"
 	"math/rand"
 	"time"
 )
 
 func Execute() {
-	// Connection
 	ctx := context.Background()
+
+	// Connection
 	conn, err := sql.Open(config.GetDBInfo())
 	internal.LogFatal(err)
 
 	crud(ctx, conn)
 	queryWithRelation(ctx, conn)
-	clearModels(ctx, conn)
-	seed(100, ctx, conn)
-	aggregate(err, ctx, conn)
+	seed(ctx, conn, 100)
+	aggregate(ctx, conn)
+	pagination(ctx, conn)
 
-	// Pagination
 	// Transform
 	// Raw Query
 	// Event
 }
 
-func aggregate(err error, ctx context.Context, conn *sql.DB) {
+func pagination(ctx context.Context, conn *sql.DB) {
+	// Limit & Offset
+	for i := 0; i < 5; i++ {
+		users, err := models.Users(
+			qm.Limit(3),
+			qm.Offset(i*3),
+		).All(ctx, conn)
+		internal.LogFatal(err)
+		internal.PrintJSONLog(users)
+	}
+
+	// Cursor
+	lastUserID := int64(0)
+	for i := 0; i < 5; i++ {
+		users, err := models.Users(
+			models.UserWhere.ID.GT(lastUserID),
+			qm.Limit(3),
+		).All(ctx, conn)
+		internal.LogFatal(err)
+		internal.PrintJSONLog(users)
+		lastUserID = users[len(users)-1].ID
+	}
+}
+
+func aggregate(ctx context.Context, conn *sql.DB) {
 	var result []struct {
 		UserID int64 `boil:"user_id"`
 		Count  int64 `boil:"count"`
 	}
-	err = models.Tasks(
+	err := models.Tasks(
 		qm.Select("count(*) as count", models.TaskColumns.UserID),
 		qm.GroupBy(models.TaskColumns.UserID),
 		qm.OrderBy("count DESC"),
@@ -47,19 +72,14 @@ func aggregate(err error, ctx context.Context, conn *sql.DB) {
 	internal.PrintJSONLog(result)
 }
 
-func clearModels(ctx context.Context, conn *sql.DB) {
-	_, err := models.Tasks().DeleteAll(ctx, conn)
-	internal.LogFatal(err)
-	_, err = models.Users().DeleteAll(ctx, conn)
-	internal.LogFatal(err)
-}
-
-func seed(count int, ctx context.Context, conn *sql.DB) {
+func seed(ctx context.Context, conn *sql.DB, count int) {
 	if count == 0 {
 		return
 	}
 
 	rand.Seed(time.Now().UnixNano())
+
+	clearModels(ctx, conn)
 
 	var newUsers []*models.User
 	for i := 0; i < count; i++ {
@@ -88,6 +108,15 @@ func seed(count int, ctx context.Context, conn *sql.DB) {
 
 		newTasks = append(newTasks, newTask)
 	}
+
+	log.Println("Seed finished")
+}
+
+func clearModels(ctx context.Context, conn *sql.DB) {
+	_, err := models.Tasks().DeleteAll(ctx, conn)
+	internal.LogFatal(err)
+	_, err = models.Users().DeleteAll(ctx, conn)
+	internal.LogFatal(err)
 }
 
 func queryWithRelation(ctx context.Context, conn *sql.DB) {
@@ -112,7 +141,7 @@ func queryWithRelation(ctx context.Context, conn *sql.DB) {
 	internal.PrintJSONLog(newTask)
 
 	// Read with relationship
-	gotTask, err := models.Tasks().One(ctx, conn)
+	gotTask, err := models.FindTask(ctx, conn, newTask.ID)
 	internal.LogFatal(err)
 	internal.PrintJSONLog(gotTask)
 
