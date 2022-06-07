@@ -18,19 +18,52 @@ import (
 func Execute() {
 	ctx := context.Background()
 
-	// Connection
-	conn, err := sql.Open(config.GetDBInfo())
-	internal.LogFatal(err)
-
+	conn := makeConnection()
 	crud(ctx, conn)
 	queryWithRelation(ctx, conn)
 	seed(ctx, conn, 100)
 	aggregate(ctx, conn)
 	pagination(ctx, conn)
-
-	// Transform
+	transform(ctx, conn)
 	// Raw Query
+
 	// Event
+}
+
+func transform(ctx context.Context, conn *sql.DB) {
+	task, err := models.Tasks(
+		models.TaskWhere.UserID.IsNotNull(),
+		qm.Load(models.TaskRels.User),
+	).One(ctx, conn)
+	internal.LogFatal(err)
+
+	// Struct way
+	internal.PrintJSONLog(
+		struct {
+			*models.Task
+			R interface{}
+		}{
+			task,
+			task.R,
+		},
+	)
+
+	// Function way
+	buildTaskOutput := func(t *models.Task) map[string]interface{} {
+		output := map[string]interface{}{
+			"id":         t.ID,
+			"user_id":    t.UserID,
+			"child_id":   t.ChildID,
+			"title":      t.Title,
+			"note":       t.Note,
+			"status":     t.Status,
+			"updated_at": t.UpdatedAt,
+			"created_at": t.CreatedAt,
+			"R":          t.R,
+		}
+		return output
+	}
+	internal.PrintJSONLog(buildTaskOutput(task))
 }
 
 func pagination(ctx context.Context, conn *sql.DB) {
@@ -196,4 +229,10 @@ func crud(ctx context.Context, conn *sql.DB) {
 	deleteRowsAff, err := models.Users().DeleteAll(ctx, conn)
 	internal.LogFatal(err)
 	internal.PrintJSONLog(deleteRowsAff)
+}
+
+func makeConnection() *sql.DB {
+	conn, err := sql.Open(config.GetDBInfo())
+	internal.LogFatal(err)
+	return conn
 }
