@@ -27,8 +27,22 @@ func Execute() {
 	pagination(ctx, conn)
 	transform(ctx, conn)
 	rawQuery(ctx, conn)
+	hook(ctx, conn)
+}
 
-	// Event
+func hook(ctx context.Context, conn *sql.DB) {
+	taskInsertHook := func(ctx context.Context, exec boil.ContextExecutor, t *models.Task) error {
+		log.Println("Insert into task", t.Title)
+		return nil
+	}
+	models.AddTaskHook(boil.BeforeInsertHook, taskInsertHook)
+	newTask := &models.Task{
+		Title:  "task 1",
+		Note:   "note 1",
+		Status: models.TaskStatusTodo,
+	}
+	err := newTask.Insert(ctx, conn, boil.Infer())
+	internal.LogFatal(err)
 }
 
 func rawQuery(ctx context.Context, conn *sql.DB) {
