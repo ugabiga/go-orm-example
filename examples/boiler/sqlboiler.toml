@@ -2,6 +2,10 @@ output = "examples/boiler/models"
 wipe = true
 add-enum-types = true
 
+[auto-columns]
+created = "created_at"
+udpated = "updated_at"
+
 [psql]
 dbname = "postgres"
 host = "localhost"

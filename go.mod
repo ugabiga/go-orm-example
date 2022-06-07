@@ -8,6 +8,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.2 // indirect
 	github.com/friendsofgo/errors v0.9.2 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
+	github.com/gofrs/uuid v4.0.0+incompatible // indirect
 	github.com/golang-migrate/migrate/v4 v4.15.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -31,6 +32,8 @@ require (
 	github.com/spf13/viper v1.9.0 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/volatiletech/inflect v0.0.1 // indirect
+	github.com/volatiletech/null/v8 v8.1.2 // indirect
+	github.com/volatiletech/randomize v0.0.1 // indirect
 	github.com/volatiletech/sqlboiler/v4 v4.11.0 // indirect
 	github.com/volatiletech/strmangle v0.0.4 // indirect
 	go.uber.org/atomic v1.7.0 // indirect

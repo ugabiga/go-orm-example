@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
+	"github.com/ugabiga/go-orm-example/examples/boiler"
 	"github.com/ugabiga/go-orm-example/internal"
 )
 
@@ -51,6 +52,6 @@ var boilerRunCmd = &cobra.Command{
 	Use:   "run",
 	Short: "run sqlboiler example",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("app")
+		boiler.Execute()
 	},
 }
