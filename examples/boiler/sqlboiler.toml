@@ -1,0 +1,11 @@
+output = "examples/boiler/models"
+wipe = true
+add-enum-types = true
+
+[psql]
+dbname = "postgres"
+host = "localhost"
+port = 5432
+user = "user"
+pass = "pass"
+sslmode = "disable"
