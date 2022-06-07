@@ -27,12 +27,16 @@ func Execute() {
 	internal.PrintJSONLog(newUser)
 
 	// Read One
-	gotUser, err := models.Users(models.UserWhere.FirstName.EQ("Sample")).One(ctx, conn)
+	gotUser, err := models.Users(
+		models.UserWhere.FirstName.EQ("Sample"),
+	).One(ctx, conn)
 	internal.LogFatal(err)
 	internal.PrintJSONLog(gotUser)
 
 	// Read List
-	gotUsers, err := models.Users(models.UserWhere.FirstName.EQ("Sample")).All(ctx, conn)
+	gotUsers, err := models.Users(
+		models.UserWhere.FirstName.EQ("Sample"),
+	).All(ctx, conn)
 	internal.LogFatal(err)
 	internal.PrintJSONLog(gotUsers)
 
