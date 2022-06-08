@@ -21,14 +21,37 @@ func Execute() {
 	ctx := context.Background()
 
 	conn := makeConnection()
+	fmt.Println("Run CRUD")
 	crud(ctx, conn)
+	fmt.Println()
+
+	fmt.Println("Run QueryWithRelation")
 	queryWithRelation(ctx, conn)
+	fmt.Println()
+
+	fmt.Println("Run Seed")
 	seed(ctx, conn, 100)
+	fmt.Println()
+
+	fmt.Println("Run Aggregation")
 	aggregate(ctx, conn)
+	fmt.Println()
+
+	fmt.Println("Run Pagination")
 	pagination(ctx, conn)
+	fmt.Println()
+
+	fmt.Println("Run Transform")
 	transform(ctx, conn)
+	fmt.Println()
+
+	fmt.Println("Run Raw Query")
 	rawQuery(ctx, conn)
+	fmt.Println()
+
+	fmt.Println("Run Hook")
 	hook(ctx, conn)
+	fmt.Println()
 }
 
 func hook(ctx context.Context, conn *sql.DB) {
