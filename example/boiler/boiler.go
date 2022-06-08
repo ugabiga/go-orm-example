@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/ugabiga/go-orm-example/config"
-	"github.com/ugabiga/go-orm-example/examples/boiler/models"
+	"github.com/ugabiga/go-orm-example/example/boiler/models"
 	"github.com/ugabiga/go-orm-example/internal"
 	"github.com/volatiletech/null/v8"
 	"github.com/volatiletech/sqlboiler/v4/boil"

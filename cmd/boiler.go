@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
-	"github.com/ugabiga/go-orm-example/examples/boiler"
+	"github.com/ugabiga/go-orm-example/example/boiler"
 	"github.com/ugabiga/go-orm-example/internal"
 )
 
@@ -13,7 +13,7 @@ func init() {
 	boilerCmd.AddCommand(boilerRunCmd)
 }
 
-var migrationPath = "file://examples/boiler/migrations"
+var migrationPath = "file://example/boiler/migrations"
 
 var boilerCmd = &cobra.Command{
 	Use:   "bo",

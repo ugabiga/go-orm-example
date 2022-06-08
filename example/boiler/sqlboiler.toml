@@ -1,4 +1,4 @@
-output = "examples/boiler/models"
+output = "example/boiler/models"
 wipe = true
 add-enum-types = true
 

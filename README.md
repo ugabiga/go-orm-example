@@ -1,8 +1,8 @@
-# go(golang) orm examples
+# go(golang) orm example
 
 This repository will compare ORMs of go languages.
 
-Check examples folder for the code. 
+Check example folder for the code. 
 
 ## ORM List
 - [x] sqlboiler
