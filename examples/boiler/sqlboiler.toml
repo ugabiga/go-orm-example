@@ -4,7 +4,7 @@ add-enum-types = true
 
 [auto-columns]
 created = "created_at"
-udpated = "updated_at"
+updated = "updated_at"
 
 [psql]
 dbname = "postgres"

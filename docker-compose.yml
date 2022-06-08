@@ -1,0 +1,16 @@
+version: '3.9'
+services:
+  postgres:
+    container_name: postgres
+    image: postgres
+    volumes:
+      - go-orm-example:/var/lib/go-orm-example/data
+    environment:
+      POSTGRES_USER: 'user'
+      POSTGRES_PASSWORD: 'pass'
+      POSTGRES_DB: 'postgres'
+    ports:
+      - "5432:5432"
+
+volumes:
+  go-orm-example:
