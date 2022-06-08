@@ -13,6 +13,7 @@ import (
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 	"log"
 	"math/rand"
+	"strings"
 	"time"
 )
 
@@ -32,7 +33,7 @@ func Execute() {
 
 func hook(ctx context.Context, conn *sql.DB) {
 	taskInsertHook := func(ctx context.Context, exec boil.ContextExecutor, t *models.Task) error {
-		log.Println("Insert into task", t.Title)
+		log.Println("Insert into task :", t.Title)
 		return nil
 	}
 	models.AddTaskHook(boil.BeforeInsertHook, taskInsertHook)
@@ -75,7 +76,7 @@ func transform(ctx context.Context, conn *sql.DB) {
 		},
 	)
 
-	// Function way
+	// Functional way
 	buildTaskOutput := func(t *models.Task) map[string]interface{} {
 		output := map[string]interface{}{
 			"id":         t.ID,
@@ -91,6 +92,21 @@ func transform(ctx context.Context, conn *sql.DB) {
 		return output
 	}
 	internal.PrintJSONLog(buildTaskOutput(task))
+
+	// Hide Column
+	convertSelectStatement := func(target []string) string {
+		return strings.Join(target, ", ")
+	}
+	taskDefaultColumns := []string{
+		models.TaskColumns.Title,
+		models.TaskColumns.Note,
+		models.TaskColumns.Status,
+	}
+	task, err = models.Tasks(
+		qm.Select(convertSelectStatement(taskDefaultColumns)),
+	).One(ctx, conn)
+	internal.PrintJSONLog(task)
+
 }
 
 func pagination(ctx context.Context, conn *sql.DB) {
@@ -145,7 +161,7 @@ func seed(ctx context.Context, conn *sql.DB, count int) {
 	for i := 0; i < count; i++ {
 		newUser := &models.User{
 			FirstName: "Sample",
-			LastName:  "Unknown",
+			LastName:  "User",
 			Birthday:  time.Now().AddDate(-30, 0, 0),
 		}
 		err := newUser.Insert(ctx, conn, boil.Infer())
@@ -220,7 +236,7 @@ func crud(ctx context.Context, conn *sql.DB) {
 	// Create
 	newUser := &models.User{
 		FirstName: "Sample",
-		LastName:  "Man",
+		LastName:  "User",
 		Birthday:  time.Now().AddDate(-30, 0, 0),
 	}
 	err := newUser.Insert(ctx, conn, boil.Infer())
@@ -243,7 +259,7 @@ func crud(ctx context.Context, conn *sql.DB) {
 
 	// Update
 	updateRowsAff, err := models.Users(
-		models.UserWhere.LastName.EQ("Man"),
+		models.UserWhere.LastName.EQ("User"),
 	).UpdateAll(
 		ctx,
 		conn,
