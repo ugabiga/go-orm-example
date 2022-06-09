@@ -66,10 +66,10 @@ func Execute() {
 	seed(ctx, conn, 100)
 	fmt.Println()
 
-	//fmt.Println("Run Aggregation")
-	//aggregate(ctx, conn)
-	//fmt.Println()
-	//
+	fmt.Println("Run Aggregation")
+	aggregate(ctx, conn)
+	fmt.Println()
+
 	//fmt.Println("Run Pagination")
 	//pagination(ctx, conn)
 	//fmt.Println()
@@ -87,12 +87,34 @@ func Execute() {
 	//fmt.Println()
 }
 
+func aggregate(ctx context.Context, c *ent.Client) {
+	//You must set the JSON field to the column name to bind it.
+	var result []struct {
+		Count     int `json:"count"`
+		UserTasks int `json:"user_tasks"`
+	}
+
+	err := c.Task.Query().
+		Order(func(s *sql.Selector) {
+			s.OrderBy(sql.Desc("count"))
+		}).
+		Limit(5).
+		GroupBy(task.UserColumn).
+		Aggregate(ent.Count()).
+		Scan(ctx, &result)
+
+	internal.LogFatal(err)
+	internal.PrintJSONLog(result)
+}
+
 func seed(ctx context.Context, c *ent.Client, count int) {
 	if count <= 0 {
 		return
 	}
 
 	rand.Seed(time.Now().UnixNano())
+
+	clearModels(ctx, c)
 
 	var bulkUsers []*ent.UserCreate
 	for i := 0; i < count; i++ {
@@ -118,6 +140,14 @@ func seed(ctx context.Context, c *ent.Client, count int) {
 	internal.LogFatal(err)
 
 	log.Println("Seed finished")
+}
+
+func clearModels(ctx context.Context, c *ent.Client) {
+	_, err := c.User.Delete().Exec(ctx)
+	internal.LogFatal(err)
+	_, err = c.Task.Delete().Exec(ctx)
+	internal.LogFatal(err)
+
 }
 
 func queryWithRelation(ctx context.Context, c *ent.Client) {
