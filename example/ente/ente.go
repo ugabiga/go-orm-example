@@ -84,11 +84,11 @@ func Execute() {
 	fmt.Println()
 
 	fmt.Println("Run Hook")
-	hookExample(ctx, conn)
+	hook(ctx, conn)
 	fmt.Println()
 }
 
-func hookExample(ctx context.Context, c *ent.Client) {
+func hook(ctx context.Context, c *ent.Client) {
 	// You can do this in schema Hook() [].ent.Hook function
 	c.Use(func(next ent2.Mutator) ent2.Mutator {
 		return ent.MutateFunc(func(ctx context.Context, m ent2.Mutation) (ent2.Value, error) {
