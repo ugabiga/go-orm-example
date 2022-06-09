@@ -7,6 +7,7 @@ import (
 
 func init() {
 	runCmd.AddCommand(boilerCmd)
+	runCmd.AddCommand(enteCmd)
 }
 
 var runCmd = &cobra.Command{
