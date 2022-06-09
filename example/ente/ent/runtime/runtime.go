@@ -5,6 +5,6 @@ package runtime
 // The schema-stitching logic is generated in github.com/ugabiga/go-orm-example/example/ente/ent/runtime.go
 
 const (
-	Version = "v0.10.1"                                         // Version of ent codegen.
-	Sum     = "h1:dM5h4Zk6yHGIgw4dCqVzGw3nWgpGYJiV4/kyHEF6PFo=" // Sum of ent codegen.
+	Version = "v0.10.2-0.20220601155507-2c3f65b5282c"           // Version of ent codegen.
+	Sum     = "h1:xf2A/DjPfCHaYICTHgAggApJ4w+tvbUnjpylG9IOHdE=" // Sum of ent codegen.
 )

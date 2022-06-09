@@ -5,7 +5,6 @@ package ent
 import (
 	"context"
 	"database/sql/driver"
-	"errors"
 	"fmt"
 	"math"
 
@@ -302,15 +301,17 @@ func (pq *ProjectQuery) WithTasks(opts ...func(*TaskQuery)) *ProjectQuery {
 //		Scan(ctx, &v)
 //
 func (pq *ProjectQuery) GroupBy(field string, fields ...string) *ProjectGroupBy {
-	group := &ProjectGroupBy{config: pq.config}
-	group.fields = append([]string{field}, fields...)
-	group.path = func(ctx context.Context) (prev *sql.Selector, err error) {
+	grbuild := &ProjectGroupBy{config: pq.config}
+	grbuild.fields = append([]string{field}, fields...)
+	grbuild.path = func(ctx context.Context) (prev *sql.Selector, err error) {
 		if err := pq.prepareQuery(ctx); err != nil {
 			return nil, err
 		}
 		return pq.sqlQuery(ctx), nil
 	}
-	return group
+	grbuild.label = project.Label
+	grbuild.flds, grbuild.scan = &grbuild.fields, grbuild.Scan
+	return grbuild
 }
 
 // Select allows the selection one or more fields/columns for the given query,
@@ -328,7 +329,10 @@ func (pq *ProjectQuery) GroupBy(field string, fields ...string) *ProjectGroupBy 
 //
 func (pq *ProjectQuery) Select(fields ...string) *ProjectSelect {
 	pq.fields = append(pq.fields, fields...)
-	return &ProjectSelect{ProjectQuery: pq}
+	selbuild := &ProjectSelect{ProjectQuery: pq}
+	selbuild.label = project.Label
+	selbuild.flds, selbuild.scan = &pq.fields, selbuild.Scan
+	return selbuild
 }
 
 func (pq *ProjectQuery) prepareQuery(ctx context.Context) error {
@@ -347,7 +351,7 @@ func (pq *ProjectQuery) prepareQuery(ctx context.Context) error {
 	return nil
 }
 
-func (pq *ProjectQuery) sqlAll(ctx context.Context) ([]*Project, error) {
+func (pq *ProjectQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Project, error) {
 	var (
 		nodes       = []*Project{}
 		_spec       = pq.querySpec()
@@ -356,17 +360,16 @@ func (pq *ProjectQuery) sqlAll(ctx context.Context) ([]*Project, error) {
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]interface{}, error) {
-		node := &Project{config: pq.config}
-		nodes = append(nodes, node)
-		return node.scanValues(columns)
+		return (*Project).scanValues(nil, columns)
 	}
 	_spec.Assign = func(columns []string, values []interface{}) error {
-		if len(nodes) == 0 {
-			return fmt.Errorf("ent: Assign called without calling ScanValues")
-		}
-		node := nodes[len(nodes)-1]
+		node := &Project{config: pq.config}
+		nodes = append(nodes, node)
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
+	}
+	for i := range hooks {
+		hooks[i](ctx, _spec)
 	}
 	if err := sqlgraph.QueryNodes(ctx, pq.driver, _spec); err != nil {
 		return nil, err
@@ -376,66 +379,54 @@ func (pq *ProjectQuery) sqlAll(ctx context.Context) ([]*Project, error) {
 	}
 
 	if query := pq.withTasks; query != nil {
-		fks := make([]driver.Value, 0, len(nodes))
-		ids := make(map[int]*Project, len(nodes))
-		for _, node := range nodes {
-			ids[node.ID] = node
-			fks = append(fks, node.ID)
+		edgeids := make([]driver.Value, len(nodes))
+		byid := make(map[int]*Project)
+		nids := make(map[int]map[*Project]struct{})
+		for i, node := range nodes {
+			edgeids[i] = node.ID
+			byid[node.ID] = node
 			node.Edges.Tasks = []*Task{}
 		}
-		var (
-			edgeids []int
-			edges   = make(map[int][]*Project)
-		)
-		_spec := &sqlgraph.EdgeQuerySpec{
-			Edge: &sqlgraph.EdgeSpec{
-				Inverse: false,
-				Table:   project.TasksTable,
-				Columns: project.TasksPrimaryKey,
-			},
-			Predicate: func(s *sql.Selector) {
-				s.Where(sql.InValues(project.TasksPrimaryKey[0], fks...))
-			},
-			ScanValues: func() [2]interface{} {
-				return [2]interface{}{new(sql.NullInt64), new(sql.NullInt64)}
-			},
-			Assign: func(out, in interface{}) error {
-				eout, ok := out.(*sql.NullInt64)
-				if !ok || eout == nil {
-					return fmt.Errorf("unexpected id value for edge-out")
+		query.Where(func(s *sql.Selector) {
+			joinT := sql.Table(project.TasksTable)
+			s.Join(joinT).On(s.C(task.FieldID), joinT.C(project.TasksPrimaryKey[1]))
+			s.Where(sql.InValues(joinT.C(project.TasksPrimaryKey[0]), edgeids...))
+			columns := s.SelectedColumns()
+			s.Select(joinT.C(project.TasksPrimaryKey[0]))
+			s.AppendSelect(columns...)
+			s.SetDistinct(false)
+		})
+		neighbors, err := query.sqlAll(ctx, func(_ context.Context, spec *sqlgraph.QuerySpec) {
+			assign := spec.Assign
+			values := spec.ScanValues
+			spec.ScanValues = func(columns []string) ([]interface{}, error) {
+				values, err := values(columns[1:])
+				if err != nil {
+					return nil, err
 				}
-				ein, ok := in.(*sql.NullInt64)
-				if !ok || ein == nil {
-					return fmt.Errorf("unexpected id value for edge-in")
+				return append([]interface{}{new(sql.NullInt64)}, values...), nil
+			}
+			spec.Assign = func(columns []string, values []interface{}) error {
+				outValue := int(values[0].(*sql.NullInt64).Int64)
+				inValue := int(values[1].(*sql.NullInt64).Int64)
+				if nids[inValue] == nil {
+					nids[inValue] = map[*Project]struct{}{byid[outValue]: struct{}{}}
+					return assign(columns[1:], values[1:])
 				}
-				outValue := int(eout.Int64)
-				inValue := int(ein.Int64)
-				node, ok := ids[outValue]
-				if !ok {
-					return fmt.Errorf("unexpected node id in edges: %v", outValue)
-				}
-				if _, ok := edges[inValue]; !ok {
-					edgeids = append(edgeids, inValue)
-				}
-				edges[inValue] = append(edges[inValue], node)
+				nids[inValue][byid[outValue]] = struct{}{}
 				return nil
-			},
-		}
-		if err := sqlgraph.QueryEdges(ctx, pq.driver, _spec); err != nil {
-			return nil, fmt.Errorf(`query edges "tasks": %w`, err)
-		}
-		query.Where(task.IDIn(edgeids...))
-		neighbors, err := query.All(ctx)
+			}
+		})
 		if err != nil {
 			return nil, err
 		}
 		for _, n := range neighbors {
-			nodes, ok := edges[n.ID]
+			nodes, ok := nids[n.ID]
 			if !ok {
 				return nil, fmt.Errorf(`unexpected "tasks" node returned %v`, n.ID)
 			}
-			for i := range nodes {
-				nodes[i].Edges.Tasks = append(nodes[i].Edges.Tasks, n)
+			for kn := range nodes {
+				kn.Edges.Tasks = append(kn.Edges.Tasks, n)
 			}
 		}
 	}
@@ -543,6 +534,7 @@ func (pq *ProjectQuery) sqlQuery(ctx context.Context) *sql.Selector {
 // ProjectGroupBy is the group-by builder for Project entities.
 type ProjectGroupBy struct {
 	config
+	selector
 	fields []string
 	fns    []AggregateFunc
 	// intermediate query (i.e. traversal path).
@@ -564,209 +556,6 @@ func (pgb *ProjectGroupBy) Scan(ctx context.Context, v interface{}) error {
 	}
 	pgb.sql = query
 	return pgb.sqlScan(ctx, v)
-}
-
-// ScanX is like Scan, but panics if an error occurs.
-func (pgb *ProjectGroupBy) ScanX(ctx context.Context, v interface{}) {
-	if err := pgb.Scan(ctx, v); err != nil {
-		panic(err)
-	}
-}
-
-// Strings returns list of strings from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (pgb *ProjectGroupBy) Strings(ctx context.Context) ([]string, error) {
-	if len(pgb.fields) > 1 {
-		return nil, errors.New("ent: ProjectGroupBy.Strings is not achievable when grouping more than 1 field")
-	}
-	var v []string
-	if err := pgb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// StringsX is like Strings, but panics if an error occurs.
-func (pgb *ProjectGroupBy) StringsX(ctx context.Context) []string {
-	v, err := pgb.Strings(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// String returns a single string from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (pgb *ProjectGroupBy) String(ctx context.Context) (_ string, err error) {
-	var v []string
-	if v, err = pgb.Strings(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{project.Label}
-	default:
-		err = fmt.Errorf("ent: ProjectGroupBy.Strings returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// StringX is like String, but panics if an error occurs.
-func (pgb *ProjectGroupBy) StringX(ctx context.Context) string {
-	v, err := pgb.String(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Ints returns list of ints from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (pgb *ProjectGroupBy) Ints(ctx context.Context) ([]int, error) {
-	if len(pgb.fields) > 1 {
-		return nil, errors.New("ent: ProjectGroupBy.Ints is not achievable when grouping more than 1 field")
-	}
-	var v []int
-	if err := pgb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// IntsX is like Ints, but panics if an error occurs.
-func (pgb *ProjectGroupBy) IntsX(ctx context.Context) []int {
-	v, err := pgb.Ints(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Int returns a single int from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (pgb *ProjectGroupBy) Int(ctx context.Context) (_ int, err error) {
-	var v []int
-	if v, err = pgb.Ints(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{project.Label}
-	default:
-		err = fmt.Errorf("ent: ProjectGroupBy.Ints returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// IntX is like Int, but panics if an error occurs.
-func (pgb *ProjectGroupBy) IntX(ctx context.Context) int {
-	v, err := pgb.Int(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64s returns list of float64s from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (pgb *ProjectGroupBy) Float64s(ctx context.Context) ([]float64, error) {
-	if len(pgb.fields) > 1 {
-		return nil, errors.New("ent: ProjectGroupBy.Float64s is not achievable when grouping more than 1 field")
-	}
-	var v []float64
-	if err := pgb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// Float64sX is like Float64s, but panics if an error occurs.
-func (pgb *ProjectGroupBy) Float64sX(ctx context.Context) []float64 {
-	v, err := pgb.Float64s(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64 returns a single float64 from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (pgb *ProjectGroupBy) Float64(ctx context.Context) (_ float64, err error) {
-	var v []float64
-	if v, err = pgb.Float64s(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{project.Label}
-	default:
-		err = fmt.Errorf("ent: ProjectGroupBy.Float64s returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// Float64X is like Float64, but panics if an error occurs.
-func (pgb *ProjectGroupBy) Float64X(ctx context.Context) float64 {
-	v, err := pgb.Float64(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bools returns list of bools from group-by.
-// It is only allowed when executing a group-by query with one field.
-func (pgb *ProjectGroupBy) Bools(ctx context.Context) ([]bool, error) {
-	if len(pgb.fields) > 1 {
-		return nil, errors.New("ent: ProjectGroupBy.Bools is not achievable when grouping more than 1 field")
-	}
-	var v []bool
-	if err := pgb.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// BoolsX is like Bools, but panics if an error occurs.
-func (pgb *ProjectGroupBy) BoolsX(ctx context.Context) []bool {
-	v, err := pgb.Bools(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bool returns a single bool from a group-by query.
-// It is only allowed when executing a group-by query with one field.
-func (pgb *ProjectGroupBy) Bool(ctx context.Context) (_ bool, err error) {
-	var v []bool
-	if v, err = pgb.Bools(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{project.Label}
-	default:
-		err = fmt.Errorf("ent: ProjectGroupBy.Bools returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// BoolX is like Bool, but panics if an error occurs.
-func (pgb *ProjectGroupBy) BoolX(ctx context.Context) bool {
-	v, err := pgb.Bool(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
 }
 
 func (pgb *ProjectGroupBy) sqlScan(ctx context.Context, v interface{}) error {
@@ -810,6 +599,7 @@ func (pgb *ProjectGroupBy) sqlQuery() *sql.Selector {
 // ProjectSelect is the builder for selecting fields of Project entities.
 type ProjectSelect struct {
 	*ProjectQuery
+	selector
 	// intermediate query (i.e. traversal path).
 	sql *sql.Selector
 }
@@ -821,201 +611,6 @@ func (ps *ProjectSelect) Scan(ctx context.Context, v interface{}) error {
 	}
 	ps.sql = ps.ProjectQuery.sqlQuery(ctx)
 	return ps.sqlScan(ctx, v)
-}
-
-// ScanX is like Scan, but panics if an error occurs.
-func (ps *ProjectSelect) ScanX(ctx context.Context, v interface{}) {
-	if err := ps.Scan(ctx, v); err != nil {
-		panic(err)
-	}
-}
-
-// Strings returns list of strings from a selector. It is only allowed when selecting one field.
-func (ps *ProjectSelect) Strings(ctx context.Context) ([]string, error) {
-	if len(ps.fields) > 1 {
-		return nil, errors.New("ent: ProjectSelect.Strings is not achievable when selecting more than 1 field")
-	}
-	var v []string
-	if err := ps.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// StringsX is like Strings, but panics if an error occurs.
-func (ps *ProjectSelect) StringsX(ctx context.Context) []string {
-	v, err := ps.Strings(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// String returns a single string from a selector. It is only allowed when selecting one field.
-func (ps *ProjectSelect) String(ctx context.Context) (_ string, err error) {
-	var v []string
-	if v, err = ps.Strings(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{project.Label}
-	default:
-		err = fmt.Errorf("ent: ProjectSelect.Strings returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// StringX is like String, but panics if an error occurs.
-func (ps *ProjectSelect) StringX(ctx context.Context) string {
-	v, err := ps.String(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Ints returns list of ints from a selector. It is only allowed when selecting one field.
-func (ps *ProjectSelect) Ints(ctx context.Context) ([]int, error) {
-	if len(ps.fields) > 1 {
-		return nil, errors.New("ent: ProjectSelect.Ints is not achievable when selecting more than 1 field")
-	}
-	var v []int
-	if err := ps.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// IntsX is like Ints, but panics if an error occurs.
-func (ps *ProjectSelect) IntsX(ctx context.Context) []int {
-	v, err := ps.Ints(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Int returns a single int from a selector. It is only allowed when selecting one field.
-func (ps *ProjectSelect) Int(ctx context.Context) (_ int, err error) {
-	var v []int
-	if v, err = ps.Ints(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{project.Label}
-	default:
-		err = fmt.Errorf("ent: ProjectSelect.Ints returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// IntX is like Int, but panics if an error occurs.
-func (ps *ProjectSelect) IntX(ctx context.Context) int {
-	v, err := ps.Int(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64s returns list of float64s from a selector. It is only allowed when selecting one field.
-func (ps *ProjectSelect) Float64s(ctx context.Context) ([]float64, error) {
-	if len(ps.fields) > 1 {
-		return nil, errors.New("ent: ProjectSelect.Float64s is not achievable when selecting more than 1 field")
-	}
-	var v []float64
-	if err := ps.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// Float64sX is like Float64s, but panics if an error occurs.
-func (ps *ProjectSelect) Float64sX(ctx context.Context) []float64 {
-	v, err := ps.Float64s(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Float64 returns a single float64 from a selector. It is only allowed when selecting one field.
-func (ps *ProjectSelect) Float64(ctx context.Context) (_ float64, err error) {
-	var v []float64
-	if v, err = ps.Float64s(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{project.Label}
-	default:
-		err = fmt.Errorf("ent: ProjectSelect.Float64s returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// Float64X is like Float64, but panics if an error occurs.
-func (ps *ProjectSelect) Float64X(ctx context.Context) float64 {
-	v, err := ps.Float64(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bools returns list of bools from a selector. It is only allowed when selecting one field.
-func (ps *ProjectSelect) Bools(ctx context.Context) ([]bool, error) {
-	if len(ps.fields) > 1 {
-		return nil, errors.New("ent: ProjectSelect.Bools is not achievable when selecting more than 1 field")
-	}
-	var v []bool
-	if err := ps.Scan(ctx, &v); err != nil {
-		return nil, err
-	}
-	return v, nil
-}
-
-// BoolsX is like Bools, but panics if an error occurs.
-func (ps *ProjectSelect) BoolsX(ctx context.Context) []bool {
-	v, err := ps.Bools(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-// Bool returns a single bool from a selector. It is only allowed when selecting one field.
-func (ps *ProjectSelect) Bool(ctx context.Context) (_ bool, err error) {
-	var v []bool
-	if v, err = ps.Bools(ctx); err != nil {
-		return
-	}
-	switch len(v) {
-	case 1:
-		return v[0], nil
-	case 0:
-		err = &NotFoundError{project.Label}
-	default:
-		err = fmt.Errorf("ent: ProjectSelect.Bools returned %d results when one was expected", len(v))
-	}
-	return
-}
-
-// BoolX is like Bool, but panics if an error occurs.
-func (ps *ProjectSelect) BoolX(ctx context.Context) bool {
-	v, err := ps.Bool(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return v
 }
 
 func (ps *ProjectSelect) sqlScan(ctx context.Context, v interface{}) error {

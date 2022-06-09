@@ -74,10 +74,10 @@ func Execute() {
 	pagination(ctx, conn)
 	fmt.Println()
 
-	//fmt.Println("Run Transform")
-	//transform(ctx, conn)
-	//fmt.Println()
-	//
+	fmt.Println("Run Transform")
+	transform(ctx, conn)
+	fmt.Println()
+
 	//fmt.Println("Run Raw Query")
 	//rawQuery(ctx, conn)
 	//fmt.Println()
@@ -85,6 +85,23 @@ func Execute() {
 	//fmt.Println("Run Hook")
 	//hook(ctx, conn)
 	//fmt.Println()
+}
+
+func transform(ctx context.Context, c *ent.Client) {
+	// Print with relation
+	gotTask, err := c.Task.Query().WithUser().First(ctx)
+	internal.LogFatal(err)
+	internal.PrintJSONLog(gotTask)
+
+	// Hide columns
+	// When you define schema for model, add Sensitive() to column that you want to hide
+	// Or use select statement
+	gotTask, err = c.Task.Query().
+		Select(task.FieldID, task.FieldTitle).
+		WithUser().
+		First(ctx)
+	internal.LogFatal(err)
+	internal.PrintJSONLog(gotTask)
 }
 
 func pagination(ctx context.Context, c *ent.Client) {
