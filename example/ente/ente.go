@@ -78,13 +78,59 @@ func Execute() {
 	transform(ctx, conn)
 	fmt.Println()
 
-	//fmt.Println("Run Raw Query")
-	//rawQuery(ctx, conn)
-	//fmt.Println()
-	//
+	fmt.Println("Run Raw Query")
+	rawQuery(ctx, conn)
+	fmt.Println()
+
 	//fmt.Println("Run Hook")
 	//hook(ctx, conn)
 	//fmt.Println()
+}
+
+func rawQuery(ctx context.Context, c *ent.Client) {
+	// QueryContext way
+	rows, err := c.QueryContext(
+		ctx,
+		"SELECT id, title FROM tasks",
+	)
+	internal.LogFatal(err)
+	for rows.Next() {
+		var id int
+		var title string
+		if err := rows.Scan(&id, &title); err != nil {
+			internal.LogFatal(err)
+		}
+		internal.PrintJSONLog(struct {
+			ID    int    `json:"id"`
+			Title string `json:"title"`
+		}{
+			id,
+			title,
+		})
+	}
+	err = rows.Close()
+	internal.LogFatal(err)
+
+	// Modifier way
+	var result []struct {
+		Count   string    `json:"count"`
+		Created time.Time `json:"created"`
+	}
+	err = c.Task.Query().
+		Modify(func(s *sql.Selector) {
+			s.Select(
+				sql.As(sql.Count("*"), "count"),
+				sql.As("DATE(created_at)", "created"),
+			).GroupBy("DATE(created_at)")
+		}).
+		Scan(ctx, &result)
+	internal.LogFatal(err)
+	internal.PrintJSONLog(result)
+
+	// ExecContext way
+	_, err = c.ExecContext(ctx, "TRUNCATE TABLE  project_tasks, tasks, users")
+	internal.LogFatal(err)
+	log.Println("Truncate completed")
 }
 
 func transform(ctx context.Context, c *ent.Client) {
