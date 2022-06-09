@@ -14,7 +14,7 @@ func init() {
 	enteCmd.AddCommand(enteGenerateMigration)
 }
 
-var enteMigrationPath = "file://example/boiler/migrations"
+var enteMigrationPath = "file://example/ente/migrations"
 
 var enteCmd = &cobra.Command{
 	Use:   "en",
@@ -44,7 +44,7 @@ var enteMigrateDownCmd = &cobra.Command{
 	Use:   "down",
 	Short: "run migrate down",
 	Run: func(cmd *cobra.Command, args []string) {
-		internal.DownMigration(migrationPath)
+		internal.DownMigration(enteMigrationPath)
 	},
 }
 

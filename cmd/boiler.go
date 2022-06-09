@@ -13,7 +13,7 @@ func init() {
 	boilerCmd.AddCommand(boilerRunCmd)
 }
 
-var migrationPath = "file://example/boiler/migrations"
+var boilerMigrationPath = "file://example/boiler/migrations"
 
 var boilerCmd = &cobra.Command{
 	Use:   "bo",
@@ -27,7 +27,7 @@ var boilerMigrateUpCmd = &cobra.Command{
 	Use:   "up",
 	Short: "run migrate up",
 	Run: func(cmd *cobra.Command, args []string) {
-		internal.UpMigration(migrationPath)
+		internal.UpMigration(boilerMigrationPath)
 	},
 }
 
@@ -35,7 +35,7 @@ var boilerMigrateDownCmd = &cobra.Command{
 	Use:   "down",
 	Short: "run migrate down",
 	Run: func(cmd *cobra.Command, args []string) {
-		internal.DownMigration(migrationPath)
+		internal.DownMigration(boilerMigrationPath)
 	},
 }
 
