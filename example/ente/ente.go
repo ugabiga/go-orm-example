@@ -70,10 +70,10 @@ func Execute() {
 	aggregate(ctx, conn)
 	fmt.Println()
 
-	//fmt.Println("Run Pagination")
-	//pagination(ctx, conn)
-	//fmt.Println()
-	//
+	fmt.Println("Run Pagination")
+	pagination(ctx, conn)
+	fmt.Println()
+
 	//fmt.Println("Run Transform")
 	//transform(ctx, conn)
 	//fmt.Println()
@@ -85,6 +85,32 @@ func Execute() {
 	//fmt.Println("Run Hook")
 	//hook(ctx, conn)
 	//fmt.Println()
+}
+
+func pagination(ctx context.Context, c *ent.Client) {
+	// Limit & Offset
+	// Must use order for id based pagination
+	for i := 0; i < 5; i++ {
+		users, err := c.User.Query().
+			Limit(3).
+			Offset(i * 3).
+			Order(ent.Asc(user.FieldID)).
+			All(ctx)
+		internal.LogFatal(err)
+		internal.PrintJSONLog(users)
+	}
+
+	// Cursor
+	lastUserID := 0
+	for i := 0; i < 5; i++ {
+		users, err := c.User.Query().
+			Where(user.IDGT(lastUserID)).
+			Limit(3).
+			All(ctx)
+		internal.LogFatal(err)
+		internal.PrintJSONLog(users)
+		lastUserID = users[len(users)-1].ID
+	}
 }
 
 func aggregate(ctx context.Context, c *ent.Client) {
