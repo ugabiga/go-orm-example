@@ -3,6 +3,7 @@ package ente
 import (
 	"ariga.io/atlas/sql/migrate"
 	"context"
+	ent2 "entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/schema"
 	"entgo.io/ent/entc"
@@ -82,9 +83,30 @@ func Execute() {
 	rawQuery(ctx, conn)
 	fmt.Println()
 
-	//fmt.Println("Run Hook")
-	//hook(ctx, conn)
-	//fmt.Println()
+	fmt.Println("Run Hook")
+	hookExample(ctx, conn)
+	fmt.Println()
+}
+
+func hookExample(ctx context.Context, c *ent.Client) {
+	// You can do this in schema Hook() [].ent.Hook function
+	c.Use(func(next ent2.Mutator) ent2.Mutator {
+		return ent.MutateFunc(func(ctx context.Context, m ent2.Mutation) (ent2.Value, error) {
+			v, err := next.Mutate(ctx, m)
+			if err != nil {
+				return nil, err
+			}
+			internal.PrintJSONLog(v)
+			return v, err
+		})
+	})
+
+	_, err := c.Task.Create().
+		SetTitle("task 1").
+		SetNote("note 1").
+		SetStatus(task.StatusTodo).
+		Save(ctx)
+	internal.LogFatal(err)
 }
 
 func rawQuery(ctx context.Context, c *ent.Client) {
