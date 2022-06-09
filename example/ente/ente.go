@@ -14,6 +14,7 @@ import (
 	"github.com/ugabiga/go-orm-example/example/ente/ent/user"
 	"github.com/ugabiga/go-orm-example/internal"
 	"log"
+	"math/rand"
 	"time"
 )
 
@@ -61,10 +62,10 @@ func Execute() {
 	queryWithRelation(ctx, conn)
 	fmt.Println()
 
-	//fmt.Println("Run Seed")
-	//seed(ctx, conn, 100)
-	//fmt.Println()
-	//
+	fmt.Println("Run Seed")
+	seed(ctx, conn, 100)
+	fmt.Println()
+
 	//fmt.Println("Run Aggregation")
 	//aggregate(ctx, conn)
 	//fmt.Println()
@@ -84,6 +85,39 @@ func Execute() {
 	//fmt.Println("Run Hook")
 	//hook(ctx, conn)
 	//fmt.Println()
+}
+
+func seed(ctx context.Context, c *ent.Client, count int) {
+	if count <= 0 {
+		return
+	}
+
+	rand.Seed(time.Now().UnixNano())
+
+	var bulkUsers []*ent.UserCreate
+	for i := 0; i < count; i++ {
+		bulkUsers = append(bulkUsers, c.User.Create().
+			SetFirstName("Sample").
+			SetLastName("User").
+			SetBirthday(time.Now().AddDate(-30, 0, 0)),
+		)
+	}
+	newUsers, err := c.User.CreateBulk(bulkUsers...).Save(ctx)
+	internal.LogFatal(err)
+
+	var bulkTasks []*ent.TaskCreate
+	for i := 0; i < count; i++ {
+		bulkTasks = append(bulkTasks, c.Task.Create().
+			SetUser(newUsers[rand.Intn(len(newUsers))]).
+			SetTitle(fmt.Sprintf("Task %d", i)).
+			SetNote(fmt.Sprintf("Note %d", i)).
+			SetStatus(task.StatusTodo),
+		)
+	}
+	_, err = c.Task.CreateBulk(bulkTasks...).Save(ctx)
+	internal.LogFatal(err)
+
+	log.Println("Seed finished")
 }
 
 func queryWithRelation(ctx context.Context, c *ent.Client) {
