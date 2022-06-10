@@ -3,7 +3,7 @@ package ente
 import (
 	"ariga.io/atlas/sql/migrate"
 	"context"
-	ent2 "entgo.io/ent"
+	entgo "entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/schema"
 	"entgo.io/ent/entc"
@@ -21,7 +21,9 @@ import (
 
 func GenerateMigration() {
 	basePath := "./example/ente"
-	graph, err := entc.LoadGraph(basePath+"/ent/schema", &gen.Config{})
+
+	graphPath := basePath + "/ent/schema"
+	graph, err := entc.LoadGraph(graphPath, &gen.Config{})
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -31,7 +33,8 @@ func GenerateMigration() {
 		log.Fatalln(err)
 	}
 
-	dir, err := migrate.NewLocalDir(basePath + "/migrations")
+	migrationPath := basePath + "/migrations"
+	dir, err := migrate.NewLocalDir(migrationPath)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -54,6 +57,12 @@ func GenerateMigration() {
 func Execute() {
 	ctx := context.Background()
 	conn := makeConnection()
+	defer func(conn *ent.Client) {
+		err := conn.Close()
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}(conn)
 
 	fmt.Println("Run CRUD")
 	crud(ctx, conn)
@@ -90,8 +99,8 @@ func Execute() {
 
 func hook(ctx context.Context, c *ent.Client) {
 	// You can do this in schema Hook() [].ent.Hook function
-	c.Use(func(next ent2.Mutator) ent2.Mutator {
-		return ent.MutateFunc(func(ctx context.Context, m ent2.Mutation) (ent2.Value, error) {
+	c.Use(func(next entgo.Mutator) entgo.Mutator {
+		return ent.MutateFunc(func(ctx context.Context, m entgo.Mutation) (entgo.Value, error) {
 			v, err := next.Mutate(ctx, m)
 			if err != nil {
 				return nil, err
@@ -199,7 +208,7 @@ func pagination(ctx context.Context, c *ent.Client) {
 }
 
 func aggregate(ctx context.Context, c *ent.Client) {
-	//You must set the JSON field to the column name to bind it.
+	//You must set the JSON field to the column name to bind from ent model.
 	var result []struct {
 		Count     int `json:"count"`
 		UserTasks int `json:"user_tasks"`
@@ -258,7 +267,6 @@ func clearModels(ctx context.Context, c *ent.Client) {
 	internal.LogFatal(err)
 	_, err = c.Task.Delete().Exec(ctx)
 	internal.LogFatal(err)
-
 }
 
 func queryWithRelation(ctx context.Context, c *ent.Client) {
@@ -317,7 +325,9 @@ func crud(ctx context.Context, c *ent.Client) {
 	internal.PrintJSONLog(gotUser)
 
 	// Read List
-	gotUsers, err := c.User.Query().Where(user.FirstNameEqualFold("Sample")).All(ctx)
+	gotUsers, err := c.User.Query().
+		Where(user.FirstNameEQ("Sample")).
+		All(ctx)
 	internal.LogFatal(err)
 	internal.PrintJSONLog(gotUsers)
 

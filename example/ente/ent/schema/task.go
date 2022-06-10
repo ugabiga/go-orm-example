@@ -16,7 +16,8 @@ type Task struct {
 func (Task) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("title"),
-		field.String("note"),
+		field.String("note").
+			Sensitive(),
 		field.Enum("status").
 			Values(
 				"todo",
