@@ -4,9 +4,15 @@ This repository will compare ORMs of go languages.
 
 Check example folder for the code. 
 
-## ORM List
+## ORM
+- sqlboiler : example/boiler
+- ent : example/ente
+- gorm
+- sqlc
+ 
+## Todo
 - [x] sqlboiler
-- [ ] ent
+- [x] ent
 - [ ] gorm
 - [ ] sqlc
 
