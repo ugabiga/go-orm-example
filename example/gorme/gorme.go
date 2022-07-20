@@ -1,6 +1,7 @@
 package gorme
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io/ioutil"
@@ -8,6 +9,7 @@ import (
 
 	"time"
 
+	"github.com/ugabiga/go-orm-example/internal"
 	"gorm.io/driver/postgres"
 
 	"gorm.io/gorm"
@@ -57,6 +59,7 @@ func writeGeneratedDDL(statements []string) {
 	for _, s := range statements {
 		ddl := fmt.Sprintf("%s;\n", s)
 		byteString = append(byteString, []byte(ddl)...)
+		//Should make your own migration down ddl method
 		log.Println(ddl)
 	}
 
@@ -90,13 +93,66 @@ func GenerateMigration() {
 }
 
 func Execute() {
+	ctx := context.Background()
 	db, err := makeConnection()
 	if err != nil {
 		log.Fatal(err)
 	}
-	db.Create(&User{FirstName: "Sample", LastName: "User"})
 
-	// var user User
-	// db.First(&user, 1)
-	// log.Println(user)
+	crud(ctx, db)
+
+}
+
+func crud(ctx context.Context, db *gorm.DB) {
+	tx := db.WithContext(ctx)
+	//Create
+	newUser := User{
+		FirstName: "Sample",
+		LastName:  "User",
+		Birthday:  sql.NullTime{Time: time.Now().AddDate(-30, 0, 0), Valid: true},
+	}
+
+	if err := tx.Create(&newUser).Error; err != nil {
+		internal.LogFatal(err)
+	}
+	internal.PrintJSONLog(newUser)
+
+	// Read
+	var user User
+	if err := tx.First(&user, "first_name = ?", "Sample").Error; err != nil {
+		internal.LogFatal(err)
+	}
+	internal.PrintJSONLog(user)
+
+	// Read List
+	var users []User
+	if err := tx.Find(&users, "first_name = ?", "Sample").Error; err != nil {
+		internal.LogFatal(err)
+	}
+	internal.PrintJSONLog(users)
+
+	// Update
+	if err := tx.Model(&User{}).Where("last_name = ?", "User").Update("last_name", "Unknown").Error; err != nil {
+		internal.LogFatal(err)
+	}
+
+	// Find updated user
+	var updatedUsers []User
+	if err := tx.Find(&updatedUsers, "last_name = ?", "Unknown").Error; err != nil {
+		internal.LogFatal(err)
+	}
+	internal.PrintJSONLog(updatedUsers)
+
+	// Delete
+	if err := tx.Where("id > 0").Delete(&User{}).Error; err != nil {
+		internal.LogFatal(err)
+	}
+	internal.PrintJSONLog("Delete Complete")
+
+	// Count
+	var count int64
+	if err := tx.Model(&User{}).Count(&count).Error; err != nil {
+		internal.LogFatal(err)
+	}
+	internal.PrintJSONLog(fmt.Sprintf("User Count: %d", count))
 }
