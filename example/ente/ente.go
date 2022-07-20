@@ -1,22 +1,23 @@
 package ente
 
 import (
-	"ariga.io/atlas/sql/migrate"
 	"context"
+	"fmt"
+	"log"
+	"math/rand"
+	"time"
+
+	"ariga.io/atlas/sql/migrate"
 	entgo "entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/schema"
 	"entgo.io/ent/entc"
 	"entgo.io/ent/entc/gen"
-	"fmt"
 	"github.com/ugabiga/go-orm-example/config"
 	"github.com/ugabiga/go-orm-example/example/ente/ent"
 	"github.com/ugabiga/go-orm-example/example/ente/ent/task"
 	"github.com/ugabiga/go-orm-example/example/ente/ent/user"
 	"github.com/ugabiga/go-orm-example/internal"
-	"log"
-	"math/rand"
-	"time"
 )
 
 func GenerateMigration() {

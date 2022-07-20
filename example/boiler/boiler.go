@@ -4,6 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
+	"math/rand"
+	"strings"
+	"time"
+
 	"github.com/ugabiga/go-orm-example/config"
 	"github.com/ugabiga/go-orm-example/example/boiler/models"
 	"github.com/ugabiga/go-orm-example/internal"
@@ -11,10 +16,6 @@ import (
 	"github.com/volatiletech/sqlboiler/v4/boil"
 	"github.com/volatiletech/sqlboiler/v4/queries"
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
-	"log"
-	"math/rand"
-	"strings"
-	"time"
 )
 
 func Execute() {
