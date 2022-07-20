@@ -119,40 +119,30 @@ func crud(ctx context.Context, db *gorm.DB) {
 
 	// Read
 	var user User
-	if err := tx.First(&user, "first_name = ?", "Sample").Error; err != nil {
+	if err := tx.First(&user, &User{FirstName: "Sample"}).Error; err != nil {
 		internal.LogFatal(err)
 	}
 	internal.PrintJSONLog(user)
 
 	// Read List
 	var users []User
-	if err := tx.Find(&users, "first_name = ?", "Sample").Error; err != nil {
+	if err := tx.Find(&users, &User{FirstName: "Sample"}).Error; err != nil {
 		internal.LogFatal(err)
 	}
 	internal.PrintJSONLog(users)
 
 	// Update
-	if err := tx.Model(&User{}).Where("last_name = ?", "User").Update("last_name", "Unknown").Error; err != nil {
+	r := tx.Model(&User{}).Where(&User{LastName: "User"}).Updates(&User{FirstName: "Unknown"})
+	if err := r.Error; err != nil {
 		internal.LogFatal(err)
 	}
-
-	// Find updated user
-	var updatedUsers []User
-	if err := tx.Find(&updatedUsers, "last_name = ?", "Unknown").Error; err != nil {
-		internal.LogFatal(err)
-	}
-	internal.PrintJSONLog(updatedUsers)
+	internal.PrintJSONLog(r.RowsAffected)
+	internal.PrintJSONLog(fmt.Sprintf("Updated rows : %d", r.RowsAffected))
 
 	// Delete
-	if err := tx.Where("id > 0").Delete(&User{}).Error; err != nil {
+	r = tx.Where("id > 0").Delete(&User{})
+	if err := r.Error; err != nil {
 		internal.LogFatal(err)
 	}
-	internal.PrintJSONLog("Delete Complete")
-
-	// Count
-	var count int64
-	if err := tx.Model(&User{}).Count(&count).Error; err != nil {
-		internal.LogFatal(err)
-	}
-	internal.PrintJSONLog(fmt.Sprintf("User Count: %d", count))
+	internal.PrintJSONLog(fmt.Sprintf("Deleted rows : %d", r.RowsAffected))
 }
